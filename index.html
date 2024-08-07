@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToDo App</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .hidden { display: none; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input { width: 100%; padding: 8px; }
+        button { padding: 10px 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ToDo App</h1>
+
+        <div id="auth-section">
+            <h2 id="auth-title">Login</h2>
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+                <button type="button" id="register-btn">Register</button>
+            </form>
+        </div>
+
+        <div id="todo-section" class="hidden">
+            <h2>ToDo List</h2>
+            <form id="todo-form">
+                <div class="form-group">
+                    <label for="todo-title">Title:</label>
+                    <input type="text" id="todo-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="todo-description">Description:</label>
+                    <input type="text" id="todo-description" name="description">
+                </div>
+                <button type="submit">Add Todo</button>
+            </form>
+            <ul id="todo-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        const apiUrl = 'http://localhost:8000';
+        const authSection = document.getElementById('auth-section');
+        const todoSection = document.getElementById('todo-section');
+        const authTitle = document.getElementById('auth-title');
+        const authForm = document.getElementById('auth-form');
+        const todoForm = document.getElementById('todo-form');
+        const todoList = document.getElementById('todo-list');
+        const registerBtn = document.getElementById('register-btn');
+
+        const tokenKey = 'authToken';
+
+        function setToken(token) {
+            localStorage.setItem(tokenKey, token);
+        }
+
+        function getToken() {
+            return localStorage.getItem(tokenKey);
+        }
+
+        function clearToken() {
+            localStorage.removeItem(tokenKey);
+        }
+
+        function isLoggedIn() {
+            return getToken() !== null;
+        }
+
+        function showAuthSection() {
+            authSection.classList.remove('hidden');
+            todoSection.classList.add('hidden');
+        }
+
+        function showTodoSection() {
+            authSection.classList.add('hidden');
+            todoSection.classList.remove('hidden');
+        }
+
+        async function login(username, password) {
+            const response = await fetch(`${apiUrl}/login?username=${username}&password=${password}`, {
+                method: 'POST',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setToken(data.access_token);
+                showTodoSection();
+                loadTodos();
+            } else {
+                alert('Login failed');
+            }
+        }
+
+        async function register(username, password) {
+            const response = await fetch(`${apiUrl}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+            if (response.ok) {
+                alert('Registration successful');
+                showAuthSection();
+            } else {
+                alert('Registration failed');
+            }
+        }
+
+        async function addTodo(title, description) {
+            const response = await fetch(`${apiUrl}/todos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ title, description }),
+            });
+            if (response.ok) {
+                loadTodos();
+            } else {
+                alert('Failed to add todo');
+            }
+        }
+
+        async function loadTodos() {
+            const response = await fetch(`${apiUrl}/todos`, {
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                }
+            });
+            if (response.ok) {
+                const todos = await response.json();
+                todoList.innerHTML = todos.map(todo => `
+                    <li>${todo.title} - ${todo.description}</li>
+                `).join('');
+            } else {
+                alert('Failed to load todos');
+            }
+        }
+
+        authForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            login(username, password);
+        });
+
+        registerBtn.addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            register(username, password);
+        });
+
+        todoForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const title = document.getElementById('todo-title').value;
+            const description = document.getElementById('todo-description').value;
+            addTodo(title, description);
+        });
+
+        if (isLoggedIn()) {
+            showTodoSection();
+            loadTodos();
+        } else {
+            showAuthSection();
+        }
+    </script>
+</body>
+</html>
